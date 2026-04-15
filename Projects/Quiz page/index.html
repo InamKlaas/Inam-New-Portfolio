@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tutoring App - Quizzes</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f4f6f9;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    background: #4A90E2;
+    color: white;
+    padding: 15px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: bold;
+  }
+  #mode-indicator {
+    margin-left: 15px;
+    font-weight: normal;
+    font-size: 16px;
+  }
+  .main-layout {
+    display: grid;
+    grid-template-columns: 1fr 2fr 1fr;
+    gap: 20px;
+    padding: 20px;
+    flex: 1;
+  }
+  .profile, .quiz-area, .tutor-panel {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
+    overflow-y: auto;
+  }
+  .quiz-categories {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .category-card {
+    background: #fafafa;
+    border: 1px solid #ddd;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.2s;
+  }
+  .category-card:hover {
+    transform: scale(1.05);
+    background: #f0f8ff;
+  }
+  .quiz-display {
+    margin-top: 20px;
+  }
+  .average-scores {
+    margin-top: 20px;
+  }
+  .average-scores h4 {
+    margin-bottom: 8px;
+  }
+  .tutor-panel {
+    display: none; /* hidden by default */
+  }
+  input, select, textarea, button {
+    margin: 5px 0;
+    padding: 8px;
+    width: 100%;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+  }
+  button {
+    background: #4A90E2;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #357ABD;
+  }
+  #role-switch {
+    margin-top: 15px;
+    background: #ff9800;
+  }
+  #role-switch:hover {
+    background: #e68900;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  📘 Tutoring App - Quizzes
+  <span id="mode-indicator"></span>
+</header>
+
+<div class="main-layout">
+  <!-- Left: Profile & Scores -->
+  <div class="profile" id="profile">
+    <!-- Profile content will be dynamically inserted here -->
+  </div>
+
+  <!-- Middle: Categories & Quizzes -->
+  <div class="quiz-area">
+    <h3>📂 Quiz Categories</h3>
+    <div class="quiz-categories" id="quiz-categories"></div>
+    <div class="quiz-display" id="quiz-display"></div>
+  </div>
+
+  <!-- Right: Tutor Panel -->
+  <div class="tutor-panel" id="tutor-panel">
+    <h3>➕ Add a New Quiz</h3>
+    <form id="quiz-form">
+      <label>Category (existing or new):</label>
+      <input type="text" id="quiz-category" required>
+      <label>Question:</label>
+      <textarea id="quiz-question" required></textarea>
+      <label>Options (comma separated):</label>
+      <input type="text" id="quiz-options" required>
+      <label>Correct Answer:</label>
+      <input type="text" id="quiz-answer" required>
+      <button type="submit">Add Quiz</button>
+    </form>
+  </div>
+</div>
+
+<script>
+  // --- Role Management ---
+  let role = prompt("Enter role: learner or tutor").toLowerCase();
+  const tutorPanel = document.getElementById("tutor-panel");
+  const roleSwitchBtn = document.createElement("button");
+  roleSwitchBtn.id = "role-switch";
+  document.querySelector('.profile').appendChild(roleSwitchBtn);
+  const profileDiv = document.getElementById("profile");
+  const modeIndicator = document.getElementById("mode-indicator");
+
+  function updateRoleUI() {
+    // Update mode indicator
+    modeIndicator.textContent = `(${role.charAt(0).toUpperCase() + role.slice(1)} Mode)`;
+
+    // Display profile depending on role
+    let profileHtml = '';
+    if (role === "learner") {
+      profileHtml = `
+        <h3>👤 Learner Profile</h3>
+        <p><b>Name:</b> Inam Klaas</p>
+        <p><b>Grade:</b> 12</p>
+        <div class="average-scores">
+          <h4>📊 Subject Averages</h4>
+          <ul id="average-scores-list"></ul>
+        </div>`;
+      tutorPanel.style.display = "none";
+      roleSwitchBtn.style.display = "none"; // Learners cannot switch
+    } else {
+      profileHtml = `
+        <h3>👨‍🏫 Tutor Profile</h3>
+        <p><b>Name:</b> Mr. Smith</p>
+        <p><b>Subject Expertise:</b> Science, Mathematics</p>
+        <div class="average-scores">
+          <h4>📊 Learner Progress</h4>
+          <ul id="average-scores-list"></ul>
+        </div>`;
+      tutorPanel.style.display = "block";
+      roleSwitchBtn.style.display = "block"; // Tutor can switch
+      roleSwitchBtn.textContent = "Switch to Learner Mode";
+    }
+    profileDiv.innerHTML = profileHtml;
+    // Re-append role switch button for tutor
+    if(role === "tutor") profileDiv.appendChild(roleSwitchBtn);
+    updateAverages();
+  }
+
+  // Tutor only: switch between tutor & learner modes
+  roleSwitchBtn.onclick = () => {
+    role = (role === "tutor") ? "learner" : "tutor";
+    updateRoleUI();
+  };
+
+  // --- Quiz Data Storage ---
+  let quizzes = JSON.parse(localStorage.getItem("quizzes")) || {
+    "Science": [
+      { q: "Water freezes at?", options: ["0°C", "100°C", "50°C"], answer: "0°C" }
+    ],
+    "Accounting": [
+      { q: "Assets = ?", options: ["Liabilities + Equity", "Income - Expenses", "Cash + Capital"], answer: "Liabilities + Equity" }
+    ],
+    "Mathematics": [
+      { q: "5 + 3 = ?", options: ["5", "8", "7"], answer: "8" }
+    ],
+    "English": [
+      { q: "‘Happy’ is a synonym of?", options: ["Sad", "Joyful", "Angry"], answer: "Joyful" }
+    ]
+  };
+
+  let scores = JSON.parse(localStorage.getItem("scores")) || {};
+
+  // --- Render Categories ---
+  function renderCategories() {
+    const catContainer = document.getElementById("quiz-categories");
+    catContainer.innerHTML = "";
+    Object.keys(quizzes).forEach(cat => {
+      let card = document.createElement("div");
+      card.className = "category-card";
+      card.innerText = cat;
+      card.onclick = () => loadCategory(cat);
+      catContainer.appendChild(card);
+    });
+  }
+
+  // --- Load Quizzes from a Category ---
+  function loadCategory(category) {
+    const display = document.getElementById("quiz-display");
+    display.innerHTML = `<h3>${category} Quizzes</h3>`;
+    quizzes[category].forEach((quiz, index) => {
+      let div = document.createElement("div");
+      div.innerHTML = `
+        <p><b>Q${index+1}:</b> ${quiz.q}</p>
+        ${quiz.options.map(opt => `
+          <label><input type="radio" name="q${category}${index}" value="${opt}"> ${opt}</label>
+        `).join("<br>")}
+        <button onclick="submitAnswer('${category}', ${index})">Submit</button>
+        <hr>`;
+      display.appendChild(div);
+    });
+  }
+
+  // --- Submit an Answer ---
+  function submitAnswer(category, index) {
+    if (role !== "learner") return; // Only learners submit
+    const radios = document.getElementsByName(`q${category}${index}`);
+    let selected = "";
+    for (let r of radios) if (r.checked) selected = r.value;
+
+    if (!scores[category]) scores[category] = { correct: 0, total: 0 };
+    scores[category].total++;
+    if (selected === quizzes[category][index].answer) {
+      scores[category].correct++;
+    }
+    localStorage.setItem("scores", JSON.stringify(scores));
+    updateAverages();
+    alert("Answer submitted!");
+  }
+
+  // --- Update Averages ---
+  function updateAverages() {
+    const avgList = document.getElementById("average-scores-list");
+    if(!avgList) return; // skip if profile not loaded yet
+    avgList.innerHTML = "";
+    Object.keys(scores).forEach(sub => {
+      let { correct, total } = scores[sub];
+      let avg = total > 0 ? ((correct / total) * 100).toFixed(1) : 0;
+      let li = document.createElement("li");
+      li.textContent = `${sub}: ${avg}%`;
+      avgList.appendChild(li);
+    });
+  }
+
+  // --- Tutor Adds New Quiz ---
+  document.getElementById("quiz-form").onsubmit = e => {
+    e.preventDefault();
+    if(role !== "tutor") return; // only tutor can add
+    let category = document.getElementById("quiz-category").value.trim();
+    let question = document.getElementById("quiz-question").value;
+    let options = document.getElementById("quiz-options").value.split(",").map(o => o.trim());
+    let answer = document.getElementById("quiz-answer").value.trim();
+
+    if (!quizzes[category]) quizzes[category] = [];
+    quizzes[category].push({ q: question, options, answer });
+
+    localStorage.setItem("quizzes", JSON.stringify(quizzes));
+    alert("Quiz added to " + category);
+    renderCategories();
+    e.target.reset();
+  };
+
+  // --- Initialize ---
+  renderCategories();
+  updateRoleUI();
+</script>
+
+</body>
+</html>
